@@ -1,121 +1,103 @@
 import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
 
 function App() {
-  const [count, setCount] = useState(0)
+  const [code, setCode] = useState('')
+  const [emailStatus, setEmailStatus] = useState(null) // null | 'sending' | 'sent' | 'error'
+  const [rotateStatus, setRotateStatus] = useState(null) // null | 'rotating' | 'success' | 'error'
+  const [message, setMessage] = useState('')
+
+  async function handleRequestEmail() {
+    setEmailStatus('sending')
+    setMessage('')
+    try {
+      const res = await fetch('/api/dvla/request-code', { method: 'POST' })
+      if (!res.ok) throw new Error(await res.text())
+      setEmailStatus('sent')
+      setMessage('Verification email sent. Check your inbox.')
+    } catch (err) {
+      setEmailStatus('error')
+      setMessage(`Failed to send email: ${err.message}`)
+    }
+  }
+
+  async function handleRotate(e) {
+    e.preventDefault()
+    if (!code.trim()) return
+    setRotateStatus('rotating')
+    setMessage('')
+    try {
+      const res = await fetch('/api/dvla/rotate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code.trim() }),
+      })
+      if (!res.ok) throw new Error(await res.text())
+      setRotateStatus('success')
+      setMessage('Password rotated and Azure updated successfully.')
+      setCode('')
+    } catch (err) {
+      setRotateStatus('error')
+      setMessage(`Rotation failed: ${err.message}`)
+    }
+  }
 
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-md w-full max-w-md p-8">
+        <h1 className="text-2xl font-semibold text-gray-800 mb-1">DVLA Password Rotation</h1>
+        <p className="text-sm text-gray-500 mb-8">Rotate the DVLA API password and update Azure automatically.</p>
+
+        {/* Step 1 */}
+        <div className="mb-8">
+          <h2 className="text-sm font-medium text-gray-700 mb-2">Step 1 — Request verification email</h2>
+          <button
+            onClick={handleRequestEmail}
+            disabled={emailStatus === 'sending'}
+            className="w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
+          >
+            {emailStatus === 'sending' ? 'Sending…' : 'Send Verification Email'}
+          </button>
+          {emailStatus === 'sent' && (
+            <p className="mt-2 text-sm text-green-600">Email sent. Check your inbox.</p>
+          )}
+          {emailStatus === 'error' && (
+            <p className="mt-2 text-sm text-red-600">{message}</p>
+          )}
         </div>
+
+        {/* Step 2 */}
         <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
+          <h2 className="text-sm font-medium text-gray-700 mb-2">Step 2 — Enter code and rotate password</h2>
+          <form onSubmit={handleRotate} className="flex flex-col gap-3">
+            <input
+              type="text"
+              value={code}
+              onChange={e => setCode(e.target.value)}
+              placeholder="Enter verification code"
+              className="border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              type="submit"
+              disabled={rotateStatus === 'rotating' || !code.trim()}
+              className="w-full bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white text-sm font-medium py-2.5 rounded-lg transition-colors"
+            >
+              {rotateStatus === 'rotating' ? 'Rotating…' : 'Rotate Password'}
+            </button>
+          </form>
+          {rotateStatus === 'success' && (
+            <p className="mt-3 text-sm text-green-600">{message}</p>
+          )}
+          {rotateStatus === 'error' && (
+            <p className="mt-3 text-sm text-red-600">{message}</p>
+          )}
         </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
 
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
+        {/* Logout */}
+        <div className="mt-10 pt-6 border-t border-gray-100 text-right">
+          <a href="/auth/logout" className="text-xs text-gray-400 hover:text-gray-600">Sign out</a>
         </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
+      </div>
+    </div>
   )
 }
 
