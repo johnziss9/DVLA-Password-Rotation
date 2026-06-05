@@ -176,10 +176,10 @@ These are stored in the **new web app's** Application Settings in Azure — not 
 
 Each step is independently testable before moving to the next.
 
-**Step 1 — Project scaffold**
+**Step 1 — Project scaffold** ✅
 Set up the monorepo structure, initialise `package.json` for both `client/` and `server/`, install dependencies.
 
-**Step 2 — Express server (bare bones)**
+**Step 2 — Express server (bare bones)** ✅
 Basic Express app running on a port, health check route, `.env` config loading.
 
 **Step 3 — Entra ID auth**
