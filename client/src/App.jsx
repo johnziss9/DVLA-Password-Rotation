@@ -31,7 +31,6 @@ function App() {
   const [message, setMessage] = useState('')
 
   function selectEnv(selected) {
-    // Reset form state when switching environment
     setEnv(selected)
     setCode('')
     setEmailStatus(null)
@@ -46,6 +45,7 @@ function App() {
       const res = await fetch('/api/dvla/request-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ env }),
       })
       if (!res.ok) throw new Error(await res.text())
@@ -65,11 +65,12 @@ function App() {
       const res = await fetch('/api/dvla/rotate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ code: code.trim(), env }),
       })
       if (!res.ok) throw new Error(await res.text())
       setRotateStatus('success')
-      setMessage('Password rotated and Azure updated successfully.')
+      setMessage('Password rotated successfully.')
       setCode('')
     } catch (err) {
       setRotateStatus('error')
@@ -95,37 +96,36 @@ function App() {
           <h1 className="text-2xl font-semibold text-gray-800 mb-1">DVLA Password Rotation</h1>
           <p className="text-sm text-gray-500 mb-8">Rotate the DVLA API password and update Azure automatically.</p>
 
-          {/* Environment selector */}
-          <div className="mb-8">
-            <p className="text-sm font-medium text-gray-700 mb-3">Select environment</p>
-            <div className="grid grid-cols-2 gap-3">
-              <button
-                onClick={() => selectEnv('sandbox')}
-                className={`py-3 rounded-lg border-2 text-sm font-medium transition-all ${
-                  env === 'sandbox'
-                    ? 'border-blue-500 bg-blue-50 text-blue-700'
-                    : 'border-gray-200 text-gray-500 hover:border-blue-300'
-                }`}
-              >
-                Sandbox
-              </button>
-              <button
-                onClick={() => selectEnv('production')}
-                className={`py-3 rounded-lg border-2 text-sm font-medium transition-all ${
-                  env === 'production'
-                    ? 'border-red-500 bg-red-50 text-red-700'
-                    : 'border-gray-200 text-gray-500 hover:border-red-300'
-                }`}
-              >
-                Production
+          {/* Environment selector — shown only before selection */}
+          {!env && (
+            <div className="mb-8">
+              <p className="text-sm font-medium text-gray-700 mb-3">Select environment to continue</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => selectEnv('sandbox')}
+                  className="py-3 rounded-lg border-2 border-gray-200 text-sm font-medium text-gray-500 hover:border-blue-300 hover:text-blue-600 transition-all"
+                >
+                  Sandbox
+                </button>
+                <button
+                  onClick={() => selectEnv('production')}
+                  className="py-3 rounded-lg border-2 border-gray-200 text-sm font-medium text-gray-500 hover:border-red-300 hover:text-red-600 transition-all"
+                >
+                  Production
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Environment indicator — shown after selection */}
+          {env && (
+            <div className={`flex items-center justify-between mb-8 px-3 py-2 rounded-lg ${theme.badge}`}>
+              <span className="text-xs font-semibold uppercase tracking-wide">{theme.label}</span>
+              <button onClick={() => selectEnv(null)} className="text-xs underline opacity-70 hover:opacity-100">
+                Change
               </button>
             </div>
-            {env && (
-              <p className={`mt-2 text-xs font-medium px-2 py-1 rounded inline-block ${theme.badge}`}>
-                {theme.label} selected
-              </p>
-            )}
-          </div>
+          )}
 
           {/* Steps — only shown once env is selected */}
           {env && (
@@ -183,6 +183,8 @@ function App() {
           </div>
         </div>
       </div>
+
+
     </div>
   )
 }

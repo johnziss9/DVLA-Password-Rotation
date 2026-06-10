@@ -9,6 +9,10 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.path}`);
+  next();
+});
 
 // Session
 app.use(session({
@@ -30,9 +34,14 @@ app.get('/api/health', (req, res) => {
 const { requireAuth } = require('./middleware/auth');
 app.use('/api/dvla', requireAuth, require('./routes/dvla'));
 
-// In development, redirect root to Vite dev server
+// In development, proxy all remaining requests to Vite dev server (auth required)
 if (process.env.NODE_ENV !== 'production') {
-  app.get('/', (req, res) => res.redirect('http://localhost:5173'));
+  const { createProxyMiddleware } = require('http-proxy-middleware');
+  app.use(requireAuth, createProxyMiddleware({
+    target: 'http://localhost:5173',
+    changeOrigin: true,
+    ws: true,
+  }));
 }
 
 // Serve React build in production

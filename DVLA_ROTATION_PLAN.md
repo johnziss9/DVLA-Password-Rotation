@@ -135,7 +135,12 @@ These are stored in the **new web app's** Application Settings in Azure — not 
 ### DVLA API
 | Setting | Description |
 |---|---|
-| TBD | To be confirmed once endpoint details are shared |
+| `DVLA_USERNAME` | DVLA API username |
+| `DVLA_EMAIL` | Email address that receives verification codes |
+| `DVLA_SANDBOX_REQUEST_URL` | Sandbox URL for requesting verification code |
+| `DVLA_PROD_REQUEST_URL` | Production URL for requesting verification code |
+| `DVLA_SANDBOX_ROTATE_URL` | Sandbox URL for rotating password |
+| `DVLA_PROD_ROTATE_URL` | Production URL for rotating password |
 
 ---
 
@@ -144,19 +149,22 @@ These are stored in the **new web app's** Application Settings in Azure — not 
 ### Endpoint 1 — Request Verification Code
 | Field | Value |
 |---|---|
-| URL | TBD |
-| Method | TBD |
-| Headers | TBD |
-| Body | TBD |
-| Trigger | Automated via node-cron (~day 85 of 90-day cycle) |
+| Sandbox URL | `https://uat.driver-vehicle-licensing.api.gov.uk/thirdparty-access/v1/new-password` |
+| Production URL | `https://driver-vehicle-licensing.api.gov.uk/thirdparty-access/v1/new-password` |
+| Method | POST |
+| Headers | None required |
+| Body | `{ userName, email }` |
+| Trigger | Automated via node-cron (~day 85) + manual button in UI |
 
 ### Endpoint 2 — Rotate Password
 | Field | Value |
 |---|---|
-| URL | TBD |
-| Method | TBD |
-| Headers | TBD |
-| Body | TBD (includes verification code + new password) |
+| Sandbox URL | `https://uat.driver-vehicle-licensing.api.gov.uk/thirdparty-access/v1/password` |
+| Production URL | `https://driver-vehicle-licensing.api.gov.uk/thirdparty-access/v1/password` |
+| Method | POST |
+| Headers | `Content-Type: application/json` |
+| Body | `{ userName, verifyCode, newPassword }` |
+| New password | Auto-generated server-side (12 chars, upper/lower/digit/special) |
 | Trigger | On user form submission |
 
 ---
@@ -182,17 +190,17 @@ Set up the monorepo structure, initialise `package.json` for both `client/` and 
 **Step 2 — Express server (bare bones)** ✅
 Basic Express app running on a port, health check route, `.env` config loading.
 
-**Step 3 — Entra ID auth**
-Wire up MSAL Node on the server, protect routes, add login/logout flow. Test that unauthenticated users get redirected.
+**Step 3 — Entra ID auth** ✅
+Wire up MSAL Node on the server, protect routes, add login/logout flow. Test that unauthenticated users get redirected. Access restricted to assigned users via Enterprise Application assignment.
 
-**Step 4 — React frontend (bare bones)**
-Vite + React + Tailwind set up, Express serves the built client. Single page with the verification code form.
+**Step 4 — React frontend** ✅
+Vite + React + Tailwind set up. UI includes explicit environment selector (Production/Sandbox) with colour differentiation — form is gated until environment is chosen. Production shown in red with warning banner, sandbox in blue.
 
-**Step 5 — DVLA Endpoint 1 (trigger verification email)**
-Server route that calls the DVLA API to request the code. Test it manually first via a button in the UI.
+**Step 5 — DVLA Endpoint 1 (trigger verification email)** ✅
+`POST /api/dvla/request-code` — calls DVLA with `userName` and `email` from env vars. Environment-aware (sandbox vs production URLs).
 
-**Step 6 — DVLA Endpoint 2 (rotate password)**
-Server route that takes the verification code and calls DVLA to rotate the password.
+**Step 6 — DVLA Endpoint 2 (rotate password)** ✅
+`POST /api/dvla/rotate` — accepts verification code from user, auto-generates a secure password server-side (12 chars, upper/lower/digit/special), calls DVLA to rotate. Azure update stubbed with TODO for Step 7.
 
 **Step 7 — Azure Management API**
 After successful rotation, update the env var on the App Service (prod + sandbox slot).
@@ -202,6 +210,27 @@ Automate Step 5 to run every ~85 days.
 
 **Step 9 — Deploy to Azure**
 Create the new Web App on the existing P0v3 plan, configure App Settings, deploy.
+
+---
+
+## Development Notes & Issues Encountered
+
+### Node.js Version Incompatibility
+Vite 8 requires Node.js 20.19+ or 22.12+. The local machine runs 20.18.1. Rather than upgrading Node (which could break other projects), Vite was downgraded to v5 which is fully compatible and functionally identical for this project.
+
+### Entra ID — Client Secret ID vs Client Secret Value
+When creating a client secret in Azure, the portal shows two columns: **Secret ID** (a GUID) and **Value** (the actual secret string). The `.env` must contain the **Value**, not the Secret ID. If the value is hidden (`***`) after leaving the page, delete the secret and create a new one — copy the Value immediately before navigating away.
+
+### MSAL PKCE Requirement
+MSAL Node uses PKCE (Proof Key for Code Exchange) by default. The initial auth implementation was missing the PKCE code verifier/challenge, causing `Authentication failed` errors on callback. Fix: generate PKCE codes during `/auth/login`, store the verifier in the session, and pass it back during `/auth/callback`.
+
+### Development Session / Cross-Port Cookie Issue
+Running Express on port 3000 and Vite on port 5173 simultaneously caused session cookies to not be shared across the two origins, resulting in `requireAuth` always redirecting API calls to `/auth/login` even after logging in. The fix was to route everything through Express on port 3000 — Express proxies non-API, non-auth requests to the Vite dev server using `http-proxy-middleware`. In development, only `http://localhost:3000` should be used; port 5173 should not be accessed directly.
+
+### Dev Workflow
+- Start Vite first: `npm run dev:client` (runs on 5173 but is accessed via 3000)
+- Start Express: `npm run dev:server` (runs on 3000, proxies to Vite)
+- Always open the app at `http://localhost:3000`
 
 ---
 
@@ -215,12 +244,8 @@ Create the new Web App on the existing P0v3 plan, configure App Settings, deploy
 
 ---
 
-## Outstanding Items Before Build
+## Outstanding Items
 
-- [ ] DVLA Endpoint 1 details (URL, method, headers, body)
-- [ ] DVLA Endpoint 2 details (URL, method, headers, body)
-- [ ] Azure App Service name + resource group + subscription ID
-- [ ] Sandbox deployment slot name
-- [ ] Confirm which email receives the DVLA verification code
-- [ ] Create Entra ID App Registration (or confirm one exists)
-- [ ] Create service principal with App Service contributor permissions
+- [ ] Azure App Service name + resource group + subscription ID (needed for Step 7)
+- [ ] Sandbox deployment slot name (needed for Step 7)
+- [ ] Create service principal with App Service contributor permissions (needed for Step 7)
